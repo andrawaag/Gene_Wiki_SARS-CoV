@@ -44,3 +44,4 @@ rdflib
 datetime
 bs4
 termcolor
+biopython
