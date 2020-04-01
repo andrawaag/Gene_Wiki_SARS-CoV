@@ -322,7 +322,7 @@ for taxid in taxids:
         item.set_label(geneinfo["name"], lang="en")
         item.set_description(scientificName + " gene", lang="en")
 
-        pprint.pprint(item.get_wd_json_representation()) ## get json for test purposes
+        # pprint.pprint(item.get_wd_json_representation()) ## get json for test purposes
         print(item.write(login))  # write the wikidata item and return the QID
 
     """### Acquiring protein information
