@@ -60,13 +60,6 @@ import urllib.request
 import gzip
 import re
 
-"""### NCBI Taxon identifier
-The genes and proteins that are to be registered in WikiData are selected based on the taxon identifier provided.
-"""
-
-taxid = "1415851" # "NCBI Taxon number here. For example: 694009"
-
-retrieved = datetime.now()
 
 # Wikidata provenance reference for NCBI Taxonomy
 def createNCBITaxReference(ncbiTaxId, retrieved):
@@ -111,8 +104,8 @@ def getTaxonItem(taxonQid):
 # Obtaining the item from the taxon id and creat the item
 def set_taxon(taxid):
   ncbiTaxon = json.loads(requests.get("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=taxonomy&id={}&format=json".format(taxid)).text)
-
   taxonitemStatements = []
+  ncbiTaxref = createNCBITaxReference(taxid, retrieved)
   ## instance of
   taxonitemStatements.append(wdi_core.WDItemID(value="Q16521", prop_nr="P31", references=[copy.deepcopy(ncbiTaxref)]))
   ## NCBI tax id
@@ -127,67 +120,9 @@ def set_taxon(taxid):
       item.set_aliases(aliases=[scientificName])
   if item.get_description(lang="en") == "":
       item.set_description(description="strain of virus", lang="en")
-  
-  pprint.pprint(item.wd_item_id) ## get json for test purposes
+
   return item
 
-"""## Start of the code
-### Authentication
-Username and password can be set at the beginning of this document for the authentication with WikiData.
-"""
-
-## Login to Wikidata
-print("Logging in...")
-if "WDUSER" in os.environ and "WDPASS" in os.environ:
-  WDUSER = os.environ['WDUSER']
-  WDPASS = os.environ['WDPASS']
-else:
-  raise ValueError("WDUSER and WDPASS must be specified in local.py or as environment variables")
-
-login = wdi_login.WDLogin(WDUSER, WDPASS)
-
-global ncbi_reference
-ncbi_reference = createNCBIGeneReference("",retrieved)
-global ncbiTaxref
-ncbiTaxref = createNCBITaxReference(taxid, retrieved)
-
-"""## Creating the taxon instance"""
-
-wd_item_taxon = set_taxon(taxid)
-# Obtain scientific name
-
-for statement in wd_item_taxon.statements:
-  if statement.get_prop_nr() == "P225":
-    scientificName = statement.value
-
-"""### Acquiring genes
-Based on the taxon id provided this section will acquire the genes from mygene.info
-"""
-
-# Obtain gene list from mygene.info
-genelist = json.loads(requests.get("https://mygene.info/v3/query?q=*&species=" + taxid).text)
-# pprint.pprint(genelist)
-for hit in genelist["hits"]:
-    ncbi_reference = createNCBIGeneReference(hit["entrezgene"], retrieved)
-    geneinfo = json.loads(requests.get("http://mygene.info/v3/gene/" + hit["entrezgene"]).text)
-    # print(geneinfo)
-    reference = []
-    statements = []
-
-    # ncbi identifer
-    statements.append(wdi_core.WDString(geneinfo["entrezgene"], prop_nr="P351", references=[copy.deepcopy(ncbi_reference)]))
-
-    item = wdi_core.WDItemEngine(data=statements)
-    # print(item.wd_item_id)
-    item.set_label(geneinfo["name"], lang="en")
-    item.set_description(scientificName + " gene", lang="en")
-
-    # pprint.pprint(item.get_wd_json_representation()) ## get json for test purposes
-    print(item.write(login))  # write the wikidata item and return the QID
-
-"""### Acquiring protein information
-Functions needed to acquire the protein information
-"""
 
 def create_or_update_uniprot_protein_item(geneid, uniprotID):
     retrieved = datetime.now()
@@ -232,8 +167,9 @@ def create_or_update_uniprot_protein_item(geneid, uniprotID):
     statements.append(wdi_core.WDItemID(taxonQID, prop_nr="P703", references=[copy.deepcopy(ncbi_reference)]))
 
     # exactMatch
-    statements.append(wdi_core.WDUrl("http://purl.uniprot.org/uniprot/"+uniprotID, prop_nr="P2888",  references=[copy.deepcopy(uniprot_reference)]))
-    
+    statements.append(wdi_core.WDUrl("http://purl.uniprot.org/uniprot/" + uniprotID, prop_nr="P2888",
+                                     references=[copy.deepcopy(uniprot_reference)]))
+
     ## Identifier statements
     # uniprot
     statements.append(wdi_core.WDString(uniprotID, prop_nr="P352", references=[copy.deepcopy(uniprot_reference)]))
@@ -249,24 +185,25 @@ def create_or_update_uniprot_protein_item(geneid, uniprotID):
     if protein_item.get_label(lang="en") == "":
         protein_item.set_label(protein_label, lang="en")
     if protein_item.get_description(lang="en") == "":
-        protein_item.set_description("protein in "+taxonname, lang="en")
+        protein_item.set_description("protein in " + taxonname, lang="en")
     if protein_item.get_description(lang="de") == "":
-        protein_item.set_description("Eiweiß in "+taxonname, lang="de")
+        protein_item.set_description("Eiweiß in " + taxonname, lang="de")
     if protein_item.get_description(lang="nl") == "":
-        protein_item.set_description("eiwit in "+taxonname, lang="nl")
+        protein_item.set_description("eiwit in " + taxonname, lang="nl")
     if protein_item.get_description(lang="es") == "":
-        protein_item.set_description("proteína en "+taxonname, lang="es")
+        protein_item.set_description("proteína en " + taxonname, lang="es")
     if protein_item.get_description(lang="it") == "":
         protein_item.set_description("Proteina in " + taxonname, lang="it")
 
     print(protein_item.get_wd_json_representation())
     protein_qid = protein_item.write(login)
     print(protein_qid)
-    
+
     ## add the newly create protein item to the gene item
     encodes = [wdi_core.WDItemID(protein_qid, prop_nr="P688", references=[copy.deepcopy(ncbi_reference)])]
     geneitem = wdi_core.WDItemEngine(wd_item_id=geneqid, data=encodes)
     return geneitem.write(login)
+
 
 def create_or_update_refseq_protein_item(geneid, refseqID):
     statements = []
@@ -314,38 +251,106 @@ def create_or_update_refseq_protein_item(geneid, refseqID):
     pprint.pprint(protein_item.get_wd_json_representation())
     protein_qid = protein_item.write(login)
     print(protein_qid)
-    
+
     ## add the newly create protein item to the gene item
     encodes = [wdi_core.WDItemID(protein_qid, prop_nr="P688", references=[copy.deepcopy(ncbi_reference)])]
     geneitem = wdi_core.WDItemEngine(wd_item_id=geneqid, data=encodes)
     return geneitem.write(login)
 
-"""## Protein run script"""
 
-# Obtain gene list from taxonid from mygene.info
-genelist = json.loads(requests.get("https://mygene.info/v3/query?q=*&species="+taxid).text)
 
-for hit in genelist["hits"]:
-    print(hit["entrezgene"])
-    geneinfo = json.loads(requests.get("http://mygene.info/v3/gene/" + hit["entrezgene"]).text)
-    # uniprot identifer
-    if "uniprot" in geneinfo.keys():
-        if "Swiss-Prot" in geneinfo["uniprot"]:
-            if isinstance(geneinfo["uniprot"]["Swiss-Prot"], list):
-                for uniprot in geneinfo["uniprot"]["Swiss-Prot"]:
-                    print(uniprot +": "+create_or_update_uniprot_protein_item(hit["entrezgene"], uniprot))
-            else:
-                print(geneinfo["uniprot"]["Swiss-Prot"] +": "+create_or_update_uniprot_protein_item(hit["entrezgene"], geneinfo["uniprot"]["Swiss-Prot"]))
-    elif "refseq" in geneinfo.keys():
-        if "protein" in geneinfo["refseq"].keys():
-            if isinstance(geneinfo["refseq"]["protein"], list):
-                for refseqID in geneinfo["refseq"]["protein"]:
+"""## Start of the code
+### Authentication
+Username and password can be set at the beginning of this document for the authentication with WikiData.
+"""
+
+## Login to Wikidata
+print("Logging in...")
+if "WDUSER" in os.environ and "WDPASS" in os.environ:
+  WDUSER = os.environ['WDUSER']
+  WDPASS = os.environ['WDPASS']
+else:
+  raise ValueError("WDUSER and WDPASS must be specified in local.py or as environment variables")
+
+"""### NCBI Taxon identifier
+The genes and proteins that are to be registered in WikiData are selected based on the taxon identifier provided.
+"""
+
+taxids = ["694009", "1335626", "277944", "11137", "290028", "31631", "2697049"] # "NCBI Taxon number here. For example: 694009"
+
+retrieved = datetime.now()
+login = wdi_login.WDLogin(WDUSER, WDPASS)
+
+
+for taxid in taxids:
+    """## Creating the taxon instance"""
+
+    item = set_taxon(taxid)
+    wd_taxid = item.wd_item_id
+
+    # Obtain scientific name
+
+    for statement in item.statements:
+        if statement.get_prop_nr() == "P225":
+            scientificName = statement.value
+
+    """### Acquiring genes
+    Based on the taxon id provided this section will acquire the genes from mygene.info
+    """
+
+    # Obtain gene list from mygene.info
+    genelist = json.loads(requests.get("https://mygene.info/v3/query?q=*&species=" + taxid).text)
+    # pprint.pprint(genelist)
+    for hit in genelist["hits"]:
+        ncbi_reference = createNCBIGeneReference(hit["entrezgene"], retrieved)
+        geneinfo = json.loads(requests.get("http://mygene.info/v3/gene/" + hit["entrezgene"]).text)
+        statements = []
+
+        ## P31 intance of
+        statements.append(
+            wdi_core.WDItemID("Q7187", prop_nr="P31", references=[copy.deepcopy(ncbi_reference)]))
+
+        ## P703 found in taxon
+        statements.append(wdi_core.WDItemID(wd_taxid, prop_nr="P703", references=[copy.deepcopy(ncbi_reference)]))
+
+        # ncbi identifer
+        statements.append(
+            wdi_core.WDString(geneinfo["entrezgene"], prop_nr="P351", references=[copy.deepcopy(ncbi_reference)]))
+
+        item = wdi_core.WDItemEngine(data=statements)
+        # print(item.wd_item_id)
+        item.set_label(geneinfo["name"], lang="en")
+        item.set_description(scientificName + " gene", lang="en")
+
+        pprint.pprint(item.get_wd_json_representation()) ## get json for test purposes
+        print(item.write(login))  # write the wikidata item and return the QID
+
+    """### Acquiring protein information
+    Functions needed to acquire the protein information
+    """
+    """## Protein run script"""
+
+    for hit in genelist["hits"]:
+        print(hit["entrezgene"])
+        geneinfo = json.loads(requests.get("http://mygene.info/v3/gene/" + hit["entrezgene"]).text)
+        # uniprot identifer
+        if "uniprot" in geneinfo.keys():
+            if "Swiss-Prot" in geneinfo["uniprot"]:
+                if isinstance(geneinfo["uniprot"]["Swiss-Prot"], list):
+                    for uniprot in geneinfo["uniprot"]["Swiss-Prot"]:
+                        print(uniprot +": "+create_or_update_uniprot_protein_item(hit["entrezgene"], uniprot))
+                else:
+                    print(geneinfo["uniprot"]["Swiss-Prot"] +": "+create_or_update_uniprot_protein_item(hit["entrezgene"], geneinfo["uniprot"]["Swiss-Prot"]))
+        elif "refseq" in geneinfo.keys():
+            if "protein" in geneinfo["refseq"].keys():
+                if isinstance(geneinfo["refseq"]["protein"], list):
+                    for refseqID in geneinfo["refseq"]["protein"]:
+                        try:
+                           print(create_or_update_refseq_protein_item(hit["entrezgene"], refseqID))
+                        except:
+                            pass
+                else:
                     try:
-                       print(create_or_update_refseq_protein_item(hit["entrezgene"], refseqID))
+                        print(create_or_update_refseq_protein_item(hit["entrezgene"], geneinfo["refseq"]["protein"]))
                     except:
                         pass
-            else:
-                try:
-                    print(create_or_update_refseq_protein_item(hit["entrezgene"], geneinfo["refseq"]["protein"]))
-                except:
-                    pass
