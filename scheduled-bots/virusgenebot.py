@@ -38,23 +38,11 @@ To add data to wikidata the wikidata integrator application is used.
 Fetching and parsing protein information is achieved through the BioPython package
 """
 
-!pip install wikidataintegrator
-!pip install biopython
-
 """### Wikidata variables
 A username and password are required to authenticate with WikiData.org
 """
 
-import os
 
-os.environ['WDUSER'] = "Andrawaag"
-os.environ['WDPASS'] = "nijntje1"
-
-"""### NCBI Taxon identifier
-The genes and proteins that are to be registered in WikiData are selected based on the taxon identifier provided.
-"""
-
-taxid = "1415851" # "NCBI Taxon number here. For example: 694009"
 
 """## Dependencies and functions"""
 
@@ -71,6 +59,12 @@ import ftplib
 import urllib.request
 import gzip
 import re
+
+"""### NCBI Taxon identifier
+The genes and proteins that are to be registered in WikiData are selected based on the taxon identifier provided.
+"""
+
+taxid = "1415851" # "NCBI Taxon number here. For example: 694009"
 
 retrieved = datetime.now()
 
